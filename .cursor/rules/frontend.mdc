@@ -1,0 +1,26 @@
+---
+description: Frontend conventions (Angular / TypeScript)
+globs: frontend/**/*.ts,frontend/**/*.html,frontend/**/*.scss
+---
+
+# Frontend rules (Angular)
+
+## Structure
+- Standalone components, feature-based folders: `calculator/`, `historical/`, `analytics/`, shared `core/` (api service, models, interceptors).
+- One `ExchangeApiService` owns all HTTP calls; components never call `HttpClient` directly.
+- DTO interfaces mirror backend responses (`/exchange`, `/analytics`, `/exchange/insight`).
+
+## Conventions
+- Strict TypeScript; no `any`. Type every API model and form.
+- Reactive forms with explicit validators; show inline validation and API error messages.
+- Every async view has an explicit loading state; disable submit while in flight.
+- Backend URL comes from `environment.apiBaseUrl` (env-configurable), never hardcoded in components.
+- Keep components presentational where possible; push logic into services.
+
+## Views (required)
+1. **Calculator** — currency pair + optional date, validated form, loading, 404 handling.
+2. **Historical** — pair + date range → raw-rates table + line chart + AI insight panel (with its own loading state).
+3. **Analytics** — visualise usage data from `/analytics`.
+
+## Testing
+- Service and key component specs (Jasmine/Karma). Generate with AI, then review.

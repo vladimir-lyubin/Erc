@@ -1,0 +1,30 @@
+---
+description: Project-wide context and conventions for the Exchange Rate Management System
+alwaysApply: true
+---
+
+# Exchange Rate Management System — global rules
+
+Monorepo: `backend/` (Java 17 + Spring Boot) and `frontend/` (Angular 15+, TypeScript).
+Full task breakdown lives in `PLAN.md`; parsed brief in `REQUIREMENTS.md`. Read them before non-trivial changes.
+
+## Non-negotiable rules
+- **Money/rates use `BigDecimal` only. Never `double`/`float` for currency math.** Divisions use an explicit scale (12) and `RoundingMode.HALF_EVEN`.
+- **The stored rate date is the date reported by the Fixer.io API, not the system fetch date.**
+- **Usage counters increment atomically** (single `UPDATE ... SET count = count + 1` query), safe under concurrency. Never read-modify-write in memory.
+- **Upsert is idempotent**: unique constraint on `(currency_code, rate_date)`; re-running the daily job must not duplicate rows.
+- **Scheduler must be multi-instance safe** (ShedLock). Justify the mechanism in the README.
+- Missing rate for a requested date → HTTP 404 with a clear error body.
+
+## Spread formula (source of truth)
+```
+rate(from,to,date) = (toRatePerEUR / fromRatePerEUR) * (1 - MAX(spread(from), spread(to)) / 100)
+```
+Spread groups: base=0%, {JPY,HKD,KRW}=3.25%, {MYR,INR,MXN}=4.50%, {RUB,CNY,ZAR}=6.00%, else=2.75%.
+Worked example must hold: EUR→PLN ≈ 4.4405487565413254.
+
+## Working style
+- Small, logical commits. Prefix AI-assisted commits with `[AI]`.
+- Prefer a working end-to-end slice over an over-engineered subsystem.
+- When you disagree with a generated approach, note the reasoning (feeds the README "AI Workflow" section).
+- Keep secrets out of the repo; config via environment variables (`FIXER_API_KEY`, LLM settings).

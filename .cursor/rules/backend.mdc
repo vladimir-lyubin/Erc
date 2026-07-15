@@ -1,0 +1,42 @@
+---
+description: Backend conventions (Spring Boot / JPA / Spring AI)
+globs: backend/**/*.java,backend/**/*.yml,backend/**/*.xml
+---
+
+# Backend rules (Spring Boot)
+
+## Layering
+- `web` — `@RestController` + request/response DTOs + `@RestControllerAdvice` for error mapping. Controllers stay thin.
+- `service` — business logic (spread calc, collection, analytics, insight). Transaction boundaries here.
+- `domain` — JPA entities (`ExchangeRate`, `CurrencyUsage`). No business logic leaking into entities.
+- `repository` — Spring Data JPA interfaces; prefer named/`@Query` methods over derived queries when clarity helps.
+- `client` — Fixer.io integration behind an interface so it can be mocked in tests.
+- `ai` — Spring AI `ChatClient` wiring + prompt templates.
+- `scheduler` — `@Scheduled` job guarded by ShedLock.
+- `config` — `@ConfigurationProperties` (spreads), CORS, OpenAPI, scheduling.
+
+## Conventions
+- Use constructor injection, never field injection. Prefer Lombok `@RequiredArgsConstructor` with `private final` fields; `@Slf4j` for logging.
+- Spreads are configuration (`application.yml` → typed properties), not hardcoded in logic.
+- Every public endpoint is documented for Swagger (`springdoc-openapi`) with meaningful summaries and response codes.
+- Prefer immutability (records for DTOs) where practical.
+
+## Lombok (mandatory)
+- Reduce boilerplate with **Lombok** — no hand-written getters/setters/constructors/builders.
+- **No experimental Lombok features** (nothing from `lombok.experimental.*`, e.g. `@FieldDefaults`, `@UtilityClass`, `@SuperBuilder`, `@Accessors`). Use only stable annotations: `@Getter`, `@Setter`, `@RequiredArgsConstructor`, `@AllArgsConstructor`, `@NoArgsConstructor`, `@Builder`, `@Slf4j`, `@EqualsAndHashCode`, `@ToString`.
+- JPA entities: `@Getter`, add `@Setter` only on fields that legitimately change; `@NoArgsConstructor(access = AccessLevel.PROTECTED)` for Hibernate plus an explicit business constructor. Do **not** put `@Data`/`@EqualsAndHashCode`/`@ToString` on entities (breaks JPA on lazy fields/identity).
+- DTOs are Java `record`s (they are the API contract, not boilerplate) — do not wrap them in Lombok.
+
+## No pointless pass-through
+- Do **not** create classes/objects whose only job is to copy fields one-to-one (no ceremonial mapper layers, no wrapper-of-a-wrapper, no DTO that duplicates another DTO). Map inline where it is a trivial projection.
+- Only introduce a new type when it adds real value (distinct API contract, validation surface, or behaviour). Keep the object graph lean — no unnecessary indirection or "load".
+
+## Validation
+- Validate inputs with **Jakarta Bean Validation annotations** (`jakarta.validation.constraints.*`: `@NotNull`, `@NotBlank`, `@Pattern`, `@Positive`, ...) on request DTOs / controller params; enable with `@Validated`.
+- For any rule not covered by built-in annotations, create a **custom constraint**: a `@Constraint` annotation backed by a `ConstraintValidator<A, T>` implementation (the "interface for new validations"). Keep validators stateless and reusable.
+- Return structured error bodies (`ProblemDetail`) from `@RestControllerAdvice` for both constraint violations and domain errors.
+
+## Testing (expected AI-generated, then reviewed)
+- Unit-test the spread calculator thoroughly (each spread group, base=0%, worked example, symmetry edge cases).
+- At least one integration test hitting `/exchange` via MockMvc against H2.
+- Test counter atomicity and upsert idempotency.
