@@ -128,8 +128,9 @@ rate(from,to,date) = (toRatePerEUR / fromRatePerEUR) * (1 - MAX(spread(from),spr
 11. [x] Вкладка Analytics.
 12. [~] Polishing: README финал ✔, Swagger ✔, покрытие тестами ✔;
     сборка/тесты backend прогнаны локально (JDK 17 + Maven 3.9.11) — **BUILD SUCCESS, 12/12 тестов зелёные** ✔;
-    Maven wrapper (`mvnw`) добавлен ✔; frontend specs ✔;
-    запуск/сборка frontend — не проверено локально (Node/npm не установлены); запись экрана — pending (ручной шаг).
+    Maven wrapper (`mvnw`) добавлен ✔;
+    frontend собран и протестирован локально (Node 22 + Angular 18) — **build OK, 7/7 specs зелёные** ✔;
+    запись экрана — pending (ручной шаг).
 
 Каждая AI-ассистированная фаза → коммит с префиксом `[AI]`.
 
