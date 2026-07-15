@@ -102,10 +102,14 @@ injects the period's real rate points into a Spring AI prompt.
 
 ## Assumptions
 
-See `PLAN.md` §2. Highlights:
-- Spread formula reconstructed from the worked example (PDF line was truncated) — pending confirmation.
-- Fixer free plan → base currency is EUR and there is no history endpoint; history accumulates from
-  first run, with an optional demo seeder (`app.seed.enabled`).
+See `PLAN.md` §2 (Q1–Q5 confirmed by the customer). Highlights:
+- Spread is **subtracted** using the **max** of the two currencies' spreads (confirmed); `exchange` is
+  returned with full `BigDecimal` precision (no forced rounding).
+- Fixer free plan → base currency is EUR and there is no history endpoint; history is **mocked for the
+  demo** via a deterministic seeder (`app.seed.enabled`).
+- Collected currencies are limited to the **main set: EUR (base), USD, GBP, AED** (`app.fixer.symbols`);
+  the seeder and the UI selectors use the same set.
+- Missing rate for a requested pair/date → **HTTP 404**, surfaced as a message on the frontend.
 - H2 by default for one-command startup; PostgreSQL profile provided.
 - No authentication (internal API); CORS open to the Angular dev server.
 
