@@ -94,6 +94,20 @@ class ExchangeApiIntegrationTest {
     }
 
     @Test
+    void returns400WhenRequiredParamMissing() throws Exception {
+        // 'to' is required — the advice turns the MissingServletRequestParameterException into 400.
+        mvc.perform(get("/exchange").param("from", "EUR"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returns400ForMalformedDate() throws Exception {
+        // Bad date format -> type mismatch, mapped to 400 by the centralized handler.
+        mvc.perform(get("/exchange").param("from", "EUR").param("to", "USD").param("date", "15-03-2024"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void analyticsReflectsUsage() throws Exception {
         mvc.perform(get("/exchange").param("from", "EUR").param("to", "PLN")).andExpect(status().isOk());
         mvc.perform(get("/exchange").param("from", "EUR").param("to", "USD")).andExpect(status().isOk());

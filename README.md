@@ -127,6 +127,6 @@ cd frontend && npm test
 Backend coverage (tests run against in-memory H2 via the `test` profile, AI mocked):
 - `SpreadCalculatorTest` — spread groups, base 0%, higher-spread selection, worked-example arithmetic.
 - `ExchangeApiIntegrationTest` — `/exchange` happy path + counter increments, 404 on missing date,
-  400 on unknown currency, `/analytics` reflecting usage (MockMvc).
+  400 on unknown currency / missing required param / malformed date, `/analytics` reflecting usage (MockMvc).
 - `UsageCounterConcurrencyTest` — 50 concurrent queries yield an exact counter (atomic increment).
 - `RateCollectionServiceTest` — upsert idempotency and value update on re-run for the same date.
