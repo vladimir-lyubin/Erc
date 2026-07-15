@@ -40,10 +40,11 @@ management:
 
 # --- Application-specific configuration ---
 app:
-  # Fixer.io integration
+  # Fixer.io integration. Collected set is limited to the main currencies (EUR base + these symbols).
   fixer:
     base-url: https://data.fixer.io/api
     api-key: ${FIXER_API_KEY:}
+    symbols: ${FIXER_SYMBOLS:USD,GBP,AED}
   # Daily collection at 12:05 AM GMT
   scheduler:
     cron: "0 5 0 * * *"

@@ -31,7 +31,13 @@ public class FixerClientImpl implements FixerClient {
             throw new IllegalStateException("FIXER_API_KEY is not configured");
         }
         LatestResponse response = restClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/latest").queryParam("access_key", config.apiKey()).build())
+                .uri(uriBuilder -> {
+                    uriBuilder.path("/latest").queryParam("access_key", config.apiKey());
+                    if (config.hasSymbols()) {
+                        uriBuilder.queryParam("symbols", String.join(",", config.symbols()));
+                    }
+                    return uriBuilder.build();
+                })
                 .retrieve()
                 .body(LatestResponse.class);
 

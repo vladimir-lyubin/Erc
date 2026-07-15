@@ -30,9 +30,9 @@ import java.util.Random;
 public class DemoDataSeeder implements ApplicationRunner {
 
     private static final String BASE = "EUR";
+    // Main currencies only (per Q5). Start values are approximate EUR-based rates.
     private static final Map<String, Double> START_RATES = Map.of(
-            "USD", 1.08, "GBP", 0.85, "PLN", 4.32, "JPY", 163.0,
-            "RUB", 98.0, "CNY", 7.8, "INR", 90.0, "HKD", 8.4, "MXN", 18.5);
+            "USD", 1.08, "GBP", 0.85, "AED", 3.96);
 
     private final AppProperties properties;
     private final ExchangeRateRepository rateRepository;
