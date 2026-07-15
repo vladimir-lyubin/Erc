@@ -1,0 +1,43 @@
+<section class="card">
+  <h2>Exchange Rate Calculator</h2>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label>
+      From
+      <select formControlName="from">
+        @for (c of currencies; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      To
+      <select formControlName="to">
+        @for (c of currencies; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Date (optional)
+      <input type="date" formControlName="date" />
+    </label>
+    <button type="submit" [disabled]="loading()">
+      {{ loading() ? 'Calculating…' : 'Calculate' }}
+    </button>
+  </form>
+
+  @if (error(); as err) {
+    <p class="error">{{ err }}</p>
+  }
+</section>
+
+@if (result(); as res) {
+  <section class="card">
+    <p class="muted">{{ res.from }} → {{ res.to }} on {{ res.date }}</p>
+    <div class="result-value">{{ res.exchange | number: '1.4-10' }}</div>
+    <p class="muted">
+      Query counts — {{ res.from }}: {{ res.fromQueryCount }}, {{ res.to }}: {{ res.toQueryCount }}
+    </p>
+  </section>
+}

@@ -1,0 +1,45 @@
+<section class="card">
+  <h2>Usage Analytics</h2>
+  <p class="muted">How often each currency has been involved in a rate query.</p>
+  @if (loading()) {
+    <p class="muted">Loading…</p>
+  }
+  @if (error(); as err) {
+    <p class="error">{{ err }}</p>
+  }
+</section>
+
+@if (!loading() && !error()) {
+  @if (stats().length === 0) {
+    <section class="card">
+      <p class="muted">No usage recorded yet. Run a few calculations first.</p>
+    </section>
+  } @else {
+    <section class="card">
+      <div style="position: relative; height: 300px">
+        <canvas baseChart type="bar" [data]="chartData()" [options]="chartOptions"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Currency</th>
+            <th>Total queries</th>
+            <th>Last queried</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of stats(); track s.currency) {
+            <tr>
+              <td>{{ s.currency }}</td>
+              <td>{{ s.totalCount }}</td>
+              <td>{{ s.lastQueried ?? '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+}
