@@ -74,8 +74,10 @@
     <h3>AI Trend Insight</h3>
     @if (insightLoading()) {
       <p class="muted">Generating insight…</p>
-    } @else if (insight(); as ins) {
-      <p class="insight">{{ ins.insight }}</p>
+    } @else {
+      @if (insight(); as ins) {
+        <p class="insight">{{ ins.insight }}</p>
+      }
     }
   </section>
 }

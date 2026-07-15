@@ -25,7 +25,7 @@ export interface HistoricalRatesResponse {
 export interface CurrencyStat {
   currency: string;
   totalCount: number;
-  lastQueried: string; // ISO date
+  lastQueried: string | null; // ISO date, null if never queried
 }
 
 export interface AnalyticsResponse {
