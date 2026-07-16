@@ -64,6 +64,16 @@ describe('ExchangeApiService', () => {
     req.flush({ from: 'EUR', to: 'USD', fromDate: '2024-03-01', toDate: '2024-03-15', points: [] });
   });
 
+  it('builds the insight request with the full date range', () => {
+    service.getInsight('EUR', 'USD', '2024-03-01', '2024-03-15').subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === `${base}/exchange/insight`);
+    expect(req.request.params.get('from')).toBe('EUR');
+    expect(req.request.params.get('fromDate')).toBe('2024-03-01');
+    expect(req.request.params.get('toDate')).toBe('2024-03-15');
+    req.flush({ from: 'EUR', to: 'USD', fromDate: '2024-03-01', toDate: '2024-03-15', insight: 'flat' });
+  });
+
   it('calls the analytics endpoint', () => {
     service.getAnalytics().subscribe();
     const req = httpMock.expectOne(`${base}/analytics`);

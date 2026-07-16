@@ -34,6 +34,42 @@ class SpreadCalculatorTest {
     }
 
     @Test
+    void unknownCurrencyFallsBackToDefaultSpread() {
+        assertThat(calculator.spreadPercent("XYZ", "EUR")).isEqualByComparingTo("2.75");
+    }
+
+    @Test
+    void spreadLookupIsCaseInsensitive() {
+        assertThat(calculator.spreadPercent("jpy", "EUR")).isEqualByComparingTo("3.25");
+        assertThat(calculator.spreadPercent("Rub", "eur")).isEqualByComparingTo("6.00");
+        // base match is case-insensitive too
+        assertThat(calculator.spreadPercent("eur", "EUR")).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void baseToBaseIsExactlyOne() {
+        BigDecimal result = calculator.spreadAdjustedRate("EUR", "EUR",
+                BigDecimal.ONE, BigDecimal.ONE, "EUR");
+        assertThat(result).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void sameNonBaseCurrencyStillAppliesItsSpread() {
+        // from == to: cross-rate is 1, but the (2.75%) spread is still applied -> 0.9725.
+        BigDecimal result = calculator.spreadAdjustedRate("USD", "USD",
+                new BigDecimal("1.08"), new BigDecimal("1.08"), "EUR");
+        assertThat(result).isEqualByComparingTo("0.9725");
+    }
+
+    @Test
+    void reciprocalRatesDivideWithScaleTwelve() {
+        // cross = 1/3 rounded HALF_EVEN at scale 12 = 0.333333333333 ; factor (EUR 0% vs default 2.75%) = 0.9725
+        BigDecimal result = calculator.spreadAdjustedRate("EUR", "GBP",
+                new BigDecimal("3"), BigDecimal.ONE, "EUR");
+        assertThat(result).isEqualByComparingTo(new BigDecimal("0.333333333333").multiply(new BigDecimal("0.9725")));
+    }
+
+    @Test
     void picksHigherOfTwoSpreads() {
         // RUB (6%) vs JPY (3.25%) -> applied 6%.
         // cross = 50/100 = 0.5 ; factor = 1 - 0.06 = 0.94 ; expected 0.47

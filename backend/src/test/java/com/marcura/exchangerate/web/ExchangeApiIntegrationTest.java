@@ -82,6 +82,34 @@ class ExchangeApiIntegrationTest {
     }
 
     @Test
+    void usesLatestDateWhenDateOmitted() throws Exception {
+        // No date param -> service falls back to the most recent stored rate date (DATE).
+        mvc.perform(get("/exchange").param("from", "EUR").param("to", "PLN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value(DATE.toString()));
+    }
+
+    @Test
+    void acceptsLowercaseCurrencyAndNormalisesResponse() throws Exception {
+        mvc.perform(get("/exchange").param("from", "eur").param("to", "pln").param("date", DATE.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.from").value("EUR"))
+                .andExpect(jsonPath("$.to").value("PLN"))
+                .andExpect(jsonPath("$.exchange").value(comparesEqualTo(new BigDecimal("4.37625"))));
+    }
+
+    @Test
+    void sameCurrencyPairAppliesSpreadAndCountsThatCurrency() throws Exception {
+        // USD->USD: cross-rate 1, USD default spread 2.75% -> 0.9725; the USD counter is bumped for both legs.
+        mvc.perform(get("/exchange").param("from", "USD").param("to", "USD").param("date", DATE.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exchange").value(comparesEqualTo(new BigDecimal("0.9725"))));
+
+        assertThat(usageRepository.findById("USD")).get()
+                .extracting(u -> u.getQueryCount()).isEqualTo(2L);
+    }
+
+    @Test
     void returns404WhenRateForDateMissing() throws Exception {
         mvc.perform(get("/exchange").param("from", "EUR").param("to", "PLN").param("date", "2000-01-01"))
                 .andExpect(status().isNotFound());
