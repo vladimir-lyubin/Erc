@@ -1,175 +1,175 @@
-# Exchange Rate Management System — разбор требований
+# Exchange Rate Management System — requirements breakdown
 
-> Документ составлен на основе `Marcura_Assessment_FullStack.pdf`.
-> Это моё понимание того, что нужно сделать, в виде структурированного чек-листа,
-> плюс список открытых вопросов в конце.
+> This document is based on the assessment brief.
+> It captures my understanding of what needs to be built as a structured checklist,
+> plus a list of open questions at the end.
 
-## 0. Суть задания
+## 0. Task summary
 
-Нужно спроектировать и реализовать **end-to-end систему управления валютными курсами**:
+Design and implement an **end-to-end exchange rate management system**:
 
 - backend API (Java/Spring Boot),
-- ежедневный планировщик сбора данных,
-- Angular-фронтенд,
-- небольшая AI-функция (генерация текстового инсайта по тренду курса).
+- a daily data-collection scheduler,
+- an Angular frontend,
+- a small AI feature (generate a textual insight about the rate trend).
 
-Задание намеренно «открытое»: единственно правильной архитектуры нет.
-**Оценивается не только результат, но и то, КАК я работаю с AI-инструментами** —
-это отдельная и очень весомая часть (25%).
+The task is intentionally open-ended: there is no single correct architecture.
+**Not only the result is evaluated, but also HOW I work with AI tools** —
+this is a separate and very significant part (25%).
 
-**Формат сдачи:**
-- GitHub-репозиторий (публичный или приватный с доступом рекрутёру) с осмысленной историей коммитов;
-- короткая запись экрана (3–5 минут) с демонстрацией работающего приложения и хотя бы одной сессии AI-агента (вживую или закадровый разбор записи).
+**Submission format:**
+- A GitHub repository (public, or private with access granted to the recruiter) with a meaningful commit history;
+- A short screen recording (3–5 minutes) demonstrating the working application and at least one AI-agent session (live or a voice-over walkthrough of the recording).
 
-## 1. Фиксированный стек (менять нельзя)
+## 1. Fixed stack (cannot be changed)
 
-| Слой | Технологии |
-|------|-----------|
-| Backend | Java 17+, Spring Boot, Maven, Hibernate / Spring Data JPA, любая реляционная БД |
-| Frontend | Angular v15+, TypeScript везде |
-| AI | Spring AI (предпочтительно) или LangChain4j + любой open-source LLM (Ollama / локальная модель / OpenAI-совместимый endpoint) |
-| AI-инструменты разработки | Хотя бы один AI-ассистент явно встроен в процесс (Claude Code, Cursor, GitHub Copilot и т.п.) |
-| Документация API | Swagger / OpenAPI |
+| Layer | Technologies |
+|-------|--------------|
+| Backend | Java 17+, Spring Boot, Maven, Hibernate / Spring Data JPA, any relational DB |
+| Frontend | Angular v15+, TypeScript everywhere |
+| AI | Spring AI (preferred) or LangChain4j + any open-source LLM (Ollama / local model / OpenAI-compatible endpoint) |
+| AI development tools | At least one AI assistant explicitly embedded in the workflow (Claude Code, Cursor, GitHub Copilot, etc.) |
+| API documentation | Swagger / OpenAPI |
 
-Всё остальное (структура проекта, библиотеки, паттерны) — на моё усмотрение.
+Everything else (project structure, libraries, patterns) is up to me.
 
-Источник курсов: **https://fixer.io/** (бесплатная подписка). Курсы тянуть **раз в день** и хранить локально, чтобы приложение не зависело от внешнего API на каждый запрос.
+Rate source: **https://fixer.io/** (free subscription). Fetch rates **once per day** and store them locally so the application does not depend on the external API on every request.
 
-## 2. Backend — требования
+## 2. Backend — requirements
 
-### 2.1 Сбор данных (Data Collection)
-- Плановая задача (scheduler), которая забирает свежие курсы с Fixer.io **раз в день в 12:05 AM GMT** и пишет их в БД.
-- В записи хранить: **код валюты, значение курса, дату расчёта курса — именно ту, что вернул API, а не системную дату** момента запроса.
-- Дубликаты курсов по одной валюте и дате обрабатывать корректно (upsert).
-- Учесть, что сервис может работать в **нескольких инстансах** в проде — планировщик должен вести себя правильно в такой среде. Важнее подход и его обоснование, чем конкретный механизм (например, ShedLock / распределённая блокировка / выбор лидера).
+### 2.1 Data Collection
+- A scheduled task that pulls the latest rates from Fixer.io **once per day at 12:05 AM GMT** and writes them to the DB.
+- Each record stores: **currency code, rate value, and the rate calculation date — exactly the one returned by the API, not the system date** at fetch time.
+- Duplicate rates for the same currency and date must be handled correctly (upsert).
+- Account for the service potentially running in **multiple instances** in production — the scheduler must behave correctly in such an environment. The approach and its justification matter more than the specific mechanism (e.g. ShedLock / distributed lock / leader election).
 
 ### 2.2 Exchange Rate API
-- REST-эндпоинт, принимающий: исходную валюту, целевую валюту и **опциональную дату**; возвращает курс с учётом спреда для пары.
-- Расчёт использует только локальные данные из БД.
-- Если дата не указана — берутся самые свежие доступные курсы.
-- Если курсов на запрошенную дату нет — вернуть подходящую HTTP-ошибку (по заданию — 404).
-- Каждый **успешный** запрос увеличивает счётчик использования для **каждой из двух** участвующих валют. Инкремент должен быть **потокобезопасным** при конкурентных запросах.
-- Формула расчёта — см. раздел 4.
+- A REST endpoint accepting: source currency, target currency, and an **optional date**; returns the spread-adjusted rate for the pair.
+- The calculation uses only local data from the DB.
+- If no date is provided — use the most recent available rates.
+- If there are no rates for the requested date — return an appropriate HTTP error (per the brief — 404).
+- Each **successful** request increments a usage counter for **each of the two** involved currencies. The increment must be **thread-safe** under concurrent requests.
+- Calculation formula — see section 4.
 
 ### 2.3 Analytics Endpoint
-- Эндпоинт, возвращающий статистику использования: как минимум **число запросов по каждой валюте** и **даты, когда делались запросы**.
-- Структура ответа — на моё усмотрение, но должна поддерживать фронтовую вкладку аналитики (см. 3.3).
+- An endpoint returning usage statistics: at minimum the **number of requests per currency** and the **dates on which requests were made**.
+- The response shape is up to me, but it must support the frontend analytics tab (see 3.3).
 
-### 2.4 Manual Refresh (опционально)
-- Дополнительный эндпоинт для ручного запуска fetch + upsert курсов **без затрагивания счётчиков использования** — необязательное расширение.
+### 2.4 Manual Refresh (optional)
+- An additional endpoint to manually trigger a fetch + upsert of rates **without touching the usage counters** — an optional extension.
 
-## 3. Frontend (Angular) — требования
+## 3. Frontend (Angular) — requirements
 
-Чистый навигируемый SPA, потребляющий backend API. **Три обязательные вкладки.**
+A clean, navigable SPA consuming the backend API. **Three required tabs.**
 
-### 3.1 Калькулятор курса
-- Выбор двух валют, опционально дата, показ курса с учётом спреда из API.
-- Форма ведёт себя адекватно: валидация полей, понятные сообщения об ошибках при ошибке API, видимый индикатор загрузки во время запроса.
+### 3.1 Rate calculator
+- Select two currencies, optionally a date, and show the spread-adjusted rate from the API.
+- The form behaves sensibly: field validation, clear error messages on API failure, and a visible loading indicator during the request.
 
-### 3.2 Историч. курсы и график тренда
-- Выбор валютной пары и диапазона дат; рядом показать **две вещи**: таблицу «сырых» курсов за период и **линейный график** движения курса во времени.
-- График не обязан быть навороченным — важна ясность тренда.
-- Рядом/под графиком — **AI-инсайт по тренду** (см. раздел 5).
+### 3.2 Historical rates & trend chart
+- Select a currency pair and date range; show **two things** side by side: a table of the "raw" rates over the period and a **line chart** of the rate movement over time.
+- The chart does not need to be fancy — trend clarity is what matters.
+- Next to / below the chart — an **AI trend insight** (see section 5).
 
-### 3.3 Дашборд аналитики
-- Визуализация данных с analytics-эндпоинта: какие валюты запрашивают чаще, за какие периоды, какие паттерны видны.
-- Способ визуализации — на моё усмотрение.
+### 3.3 Analytics dashboard
+- Visualise data from the analytics endpoint: which currencies are queried most often, over which periods, and any visible patterns.
+- The visualisation approach is up to me.
 
-### 3.4 Стандарты фронтенда
-- Приложение запускается через `ng serve`, указывая на backend через **конфигурируемую environment-переменную** — чтобы ревьюер запустил локально без правок кода.
-- Оценивается качество: дизайн компонентов, разделение ответственности, типобезопасность, следование best practices Angular.
+### 3.4 Frontend standards
+- The app runs via `ng serve`, pointing at the backend through a **configurable environment variable** — so a reviewer can run it locally without editing code.
+- Quality is evaluated: component design, separation of concerns, type safety, and adherence to Angular best practices.
 
-## 4. Расчёт курса с учётом спреда
+## 4. Spread-adjusted rate calculation
 
-### 4.1 Формула
-Применяется спред той валюты в паре, у которой он **выше**:
+### 4.1 Formula
+The spread of whichever currency in the pair is **higher** is applied:
 
 ```
 SpreadAdjustedRate = (toRate / fromRate) × (1 − MAX(toSpread, fromSpread) / 100)
 ```
 
-> ⚠️ В PDF строка с формулой обрезана до `MAX(toSpread, fromSpread)) / 100)`.
-> Приведённый вид **реконструирован из worked example** (см. ниже) и требует подтверждения — см. вопрос Q1.
+> ⚠️ In the PDF the formula line is truncated to `MAX(toSpread, fromSpread)) / 100)`.
+> The form above is **reconstructed from the worked example** (below) and required confirmation — see question Q1.
 
-### 4.2 Разобранный пример
+### 4.2 Worked example
 | | EUR | PLN |
 |--|-----|-----|
 | Rate to USD | 0.8 | 3.7 |
 | Spread | 1% | 4% |
 
-Ожидаемый ответ из Appendix A: `EUR → PLN = 4.4405487565413254`.
+Expected response from Appendix A: `EUR → PLN = 4.4405487565413254`.
 
-Проверка: `(3.7 / 0.8) × (1 − max(1%, 4%)) = 4.625 × 0.96 = 4.44` — сходится
-(значения 0.8 и 3.7 в таблице округлены для показа, отсюда небольшое расхождение с полным числом).
+Check: `(3.7 / 0.8) × (1 − max(1%, 4%)) = 4.625 × 0.96 = 4.44` — consistent
+(the values 0.8 and 3.7 in the table are rounded for display, hence the small discrepancy with the full number).
 
-### 4.3 Справочник спредов (Appendix B)
-| Группа валют | Спред % |
-|--------------|---------|
-| Базовая валюта (как её возвращает ваш ключ Fixer.io) | 0.00% |
+### 4.3 Spread reference table (Appendix B)
+| Currency group | Spread % |
+|----------------|----------|
+| Base currency (as returned by your Fixer.io key) | 0.00% |
 | JPY, HKD, KRW | 3.25% |
 | MYR, INR, MXN | 4.50% |
 | RUB, CNY, ZAR | 6.00% |
-| Все остальные валюты | 2.75% |
+| All other currencies | 2.75% |
 
-**Важно про точность:** оценивается использование `BigDecimal` (не `double`) и корректная числовая точность.
+**Precision note:** the use of `BigDecimal` (not `double`) and correct numerical precision is evaluated.
 
-## 5. AI-инсайт по тренду
+## 5. AI trend insight
 
-### 5.1 Что делаем
-- Когда пользователь смотрит вкладку «Историч. курсы и график тренда» (3.2), генерируется и показывается **короткий текстовый инсайт** о тренде курса за выбранный период.
-- Инсайт формирует LLM через **Spring AI** (или LangChain4j), при этом **исторические данные курса за период передаются в промпт как контекст**.
-- Текст должен быть кратким и читаемым; финансовая точность не требуется. Главное — LLM реально анализирует переданные числа, а не выдаёт generic-ответ.
+### 5.1 What we build
+- When the user views the "Historical rates & trend chart" tab (3.2), a **short textual insight** about the rate trend over the selected period is generated and shown.
+- The insight is produced by an LLM via **Spring AI** (or LangChain4j), with the **historical rate data for the period passed into the prompt as context**.
+- The text must be concise and readable; financial accuracy is not required. The key point is that the LLM actually analyses the provided numbers rather than producing a generic answer.
 
-### 5.2 Технические ожидания
-- Использовать chat client абстракцию Spring AI (или эквивалент) с локальной open-source моделью (проще всего — Ollama) либо любым OpenAI-совместимым endpoint. Модель — на выбор.
-- Ключевое:
-  - данные за период **инжектятся в промпт** (модель читает реальные числа, а не угадывает);
-  - **system prompt** спроектирован так, чтобы ограничить вывод кратким релевантным инсайтом (качество промпта оценивается);
-  - backend отдаёт эндпоинт, который дёргает фронт для получения инсайта;
-  - фронт отображает инсайт аккуратно, с индикатором загрузки;
-  - настройка модели описана в README, чтобы ревьюер запустил локально без гадания.
+### 5.2 Technical expectations
+- Use the Spring AI chat client abstraction (or equivalent) with a local open-source model (Ollama is the simplest) or any OpenAI-compatible endpoint. The model is my choice.
+- Key points:
+  - the period's data is **injected into the prompt** (the model reads real numbers rather than guessing);
+  - the **system prompt** is designed to constrain the output to a concise, relevant insight (prompt quality is evaluated);
+  - the backend exposes an endpoint the frontend calls to obtain the insight;
+  - the frontend displays the insight cleanly, with a loading indicator;
+  - the model setup is documented in the README so a reviewer can run it locally without guessing.
 
-### 5.3 Чего НЕ ждут
-- Не ждут финансовой точности, fine-tuned модели или production-grade RAG.
-- Ждут корректной обвязки Spring AI, продуманного промпта и **реально работающей end-to-end** фичи. Хорошо интегрированное простое решение ценится выше переусложнённого, но нерабочего.
+### 5.3 What is NOT expected
+- No financial accuracy, fine-tuned models, or production-grade RAG.
+- What is expected: correct Spring AI wiring, a well-thought-out prompt, and a **genuinely working end-to-end** feature. A well-integrated simple solution is valued over an over-engineered but non-working one.
 
-## 6. AI-augmented разработка (ОБЯЗАТЕЛЬНО, вес 25%)
+## 6. AI-augmented development (REQUIRED, 25% weight)
 
-Использование AI-инструментов — обязательное требование роли. Оценивается **качество использования**, а не сам факт: AI как «умный автокомплит» vs AI как полноценный слой автоматизации workflow.
+Using AI tools is a mandatory requirement of the role. The **quality of usage** is evaluated, not the mere fact: AI as "smart autocomplete" vs AI as a full workflow-automation layer.
 
-### 6.1 Что должно быть в репозитории (Required Evidence)
-1. **`PLAN.md`** (или эквивалент) — артефакт планирования, созданный с помощью AI **до** начала реализации.
-2. **Конфиг-файлы AI-инструментов** в коммитах: `CLAUDE.md`, `.cursor/rules`, конфиг Copilot workspace, кастомные slash-команды и т.п. Пустой/отсутствующий конфиг = сигнал поверхностного использования.
-3. **Раздел README «AI Workflow»**: какой инструмент использовал, как его настроил, и **минимум один пример**, где агент выдал что-то, с чем я не согласился, — и что я с этим сделал.
-4. **История коммитов**, где видны AI-ассистированные фазы — использовать единый префикс, например `[AI]`, чтобы ревьюер отследил вклад без чтения каждого диффа.
+### 6.1 What must be in the repository (Required Evidence)
+1. **`PLAN.md`** (or equivalent) — a planning artefact created with AI **before** implementation began.
+2. **AI tool configuration files** committed: `CLAUDE.md`, `.cursor/rules`, Copilot workspace config, custom slash commands, etc. An empty/missing config signals shallow usage.
+3. **A README "AI Workflow" section**: which tool I used, how I configured it, and **at least one example** where the agent produced something I disagreed with — and what I did about it.
+4. **A commit history** where AI-assisted phases are visible — use a single prefix, e.g. `[AI]`, so the reviewer can trace the contribution without reading every diff.
 
-### 6.2 Что будут оценивать
-Репозиторий смотрят как окно в мой ежедневный стиль работы: AI как инструмент workflow или как костыль? Есть ли следы настоящего агентного использования (многошагового, контекстно-осознанного, итеративного), а не одноразовой генерации? Переопределял ли я AI и могу ли объяснить почему.
+### 6.2 What will be evaluated
+The repository is viewed as a window into my everyday working style: AI as a workflow tool or as a crutch? Are there traces of genuine agentic use (multi-step, context-aware, iterative) rather than one-off generation? Did I override the AI and can I explain why.
 
-## 7. Требования к сдаче (Submission)
+## 7. Submission requirements
 
-- GitHub-репозиторий с осмысленной историей коммитов.
-- **README** покрывает: локальную установку и запуск, обзор архитектуры, раздел «AI Workflow» (см. 6.1), сделанные допущения, известные trade-offs.
-- **Запись экрана 3–5 минут**: работающее приложение + минимум одна сессия AI-агента (вживую или закадровый разбор). Процесс важен не меньше, чем продукт.
+- A GitHub repository with a meaningful commit history.
+- **README** covering: local setup and run, architecture overview, an "AI Workflow" section (see 6.1), assumptions made, and known trade-offs.
+- **A 3–5 minute screen recording**: the working application + at least one AI-agent session (live or voice-over walkthrough). The process matters as much as the product.
 
-## 8. Рубрика оценки (где сосредоточены баллы)
+## 8. Scoring rubric (where the points are)
 
-| Область | Вес | Разбивка |
-|---------|-----|----------|
-| **BACKEND** | **25%** | Core API correctness (Spring MVC/REST) 8%; Data persistence & scheduler 6%; Concurrency & thread safety 5%; Code quality (BigDecimal, разделение слоёв, named queries) 6% |
+| Area | Weight | Breakdown |
+|------|--------|-----------|
+| **BACKEND** | **25%** | Core API correctness (Spring MVC/REST) 8%; Data persistence & scheduler 6%; Concurrency & thread safety 5%; Code quality (BigDecimal, layer separation, named queries) 6% |
 | **FRONTEND** | **20%** | Calculator view 6%; Historical rates & trend chart 8%; Analytics dashboard 6% |
 | **AI TREND INSIGHT** | **20%** | Spring AI wiring 8%; Prompt design 7%; Frontend integration 5% |
 | **AI-AUGMENTED WORKFLOW** | **25%** | Planning artefact 5%; Tool configuration 8%; Agentic workflow evidence 7%; Critical AI use 5% |
-| **OVERALL ENGINEERING** | **10%** | API documentation (Swagger) 3%; Testing (JUnit/Mockito/Angular, покрытие формулы + ≥1 integration test) 4%; README & docs quality 3% |
-| **ИТОГО** | **100%** | |
+| **OVERALL ENGINEERING** | **10%** | API documentation (Swagger) 3%; Testing (JUnit/Mockito/Angular, formula coverage + ≥1 integration test) 4%; README & docs quality 3% |
+| **TOTAL** | **100%** | |
 
-**Порог для прохода на интервью: 60%.**
-Замечания:
-- Сильный AI-workflow может компенсировать неполные фичи.
-- Кандидат, выполнивший весь backend+frontend, но без содержательных следов AI-workflow, **не может превысить 75%**.
-- Тестовые сюиты **ожидаются AI-сгенерированными**.
+**Interview threshold: 60%.**
+Notes:
+- A strong AI workflow can compensate for incomplete features.
+- A candidate who completes the entire backend+frontend but leaves no meaningful AI-workflow evidence **cannot exceed 75%**.
+- Test suites are **expected to be AI-generated**.
 
-## 9. Форматы ответов API (Appendix A)
+## 9. API response formats (Appendix A)
 
 `GET /exchange`
 ```json
@@ -183,7 +183,7 @@ SpreadAdjustedRate = (toRate / fromRate) × (1 − MAX(toSpread, fromSpread) / 1
 }
 ```
 
-`GET /analytics` (форма — предложенная, дизайн мой)
+`GET /analytics` (shape suggested, design is mine)
 ```json
 {
   "topCurrencies": [
@@ -193,7 +193,7 @@ SpreadAdjustedRate = (toRate / fromRate) × (1 − MAX(toSpread, fromSpread) / 1
 }
 ```
 
-`GET /exchange/insight` (форма — предложенная, дизайн мой)
+`GET /exchange/insight` (shape suggested, design is mine)
 ```json
 {
   "from": "EUR",
@@ -204,47 +204,47 @@ SpreadAdjustedRate = (toRate / fromRate) × (1 − MAX(toSpread, fromSpread) / 1
 }
 ```
 
-## 10. Итоговый чек-лист «Definition of Done»
+## 10. Final "Definition of Done" checklist
 
-- [ ] Backend: scheduler на 12:05 AM GMT, upsert, дата из API, multi-instance-safe.
-- [ ] Backend: `GET /exchange` со спред-формулой на `BigDecimal`, опциональная дата, 404 при отсутствии, потокобезопасные счётчики.
+- [ ] Backend: scheduler at 12:05 AM GMT, upsert, date from the API, multi-instance-safe.
+- [ ] Backend: `GET /exchange` with the spread formula on `BigDecimal`, optional date, 404 when missing, thread-safe counters.
 - [ ] Backend: `GET /analytics`.
-- [ ] Backend (опц.): manual refresh без изменения счётчиков.
-- [ ] Frontend: 3 вкладки (калькулятор, история+график+инсайт, аналитика), env-конфиг backend URL.
-- [ ] AI: Spring AI + локальная модель, реальные данные в промпте, продуманный system prompt, эндпоинт + отображение с loading.
-- [ ] Swagger/OpenAPI работает, все эндпоинты задокументированы.
-- [ ] Тесты: формула спреда + ≥1 integration test (желательно AI-сгенерированные).
-- [ ] `PLAN.md`, конфиги AI-инструментов, README с разделом «AI Workflow», коммиты с префиксом `[AI]`.
-- [ ] README: setup/run, архитектура, допущения, trade-offs.
-- [ ] Запись экрана 3–5 мин.
+- [ ] Backend (optional): manual refresh without changing counters.
+- [ ] Frontend: 3 tabs (calculator, history+chart+insight, analytics), env-configured backend URL.
+- [ ] AI: Spring AI + local model, real data in the prompt, well-designed system prompt, endpoint + display with loading.
+- [ ] Swagger/OpenAPI works, all endpoints documented.
+- [ ] Tests: spread formula + ≥1 integration test (preferably AI-generated).
+- [ ] `PLAN.md`, AI tool config files, README with an "AI Workflow" section, commits prefixed `[AI]`.
+- [ ] README: setup/run, architecture, assumptions, trade-offs.
+- [ ] 3–5 min screen recording.
 
 ---
 
-## 11. Открытые вопросы (чего мне не хватает)
+## 11. Open questions (what I was missing)
 
-> **Статус:** Q1–Q5 подтверждены заказчиком (2026-07-15). Ниже — исходный вопрос + принятое решение.
+> **Status:** Q1–Q5 confirmed by the customer (2026-07-15). Below is the original question + the accepted decision.
 
-**Про формулу и расчёт:**
-- **Q1.** Строка формулы в PDF обрезана. Подтвердите точный вид: `(toRate / fromRate) × (1 − MAX(toSpread, fromSpread)/100)` — спред **вычитается**? И применяется ли он единожды (max из двух), а не суммой обоих спредов? (Из worked example выходит именно вычитание max.)
-  - **✅ Решено:** да — спред **вычитается**, берётся **max** из двух (не сумма). Реализовано в `SpreadCalculator`, покрыто unit-тестами.
-- **Q2.** Fixer.io free возвращает курсы **только с базой EUR**. Кросс-курс `from→to` считаю как `toRate/fromRate` (обе к EUR)? Что если запрошена пара, где нет одной из валют на нужную дату?
-  - **✅ Решено:** кросс-курс приводится к EUR (`toRatePerEUR / fromRatePerEUR`). Если курса нет на дату — backend отвечает **HTTP 404** (корректный REST), фронт показывает сообщение, что пары/данных по конфигурации не найдено. Для исторического диапазона без точек — пустой список `points: []` и сообщение на UI.
-- **Q3.** Округление итогового `exchange`: сколько знаков, режим округления? В примере значение хранится с полной точностью — отдавать «как есть» (без округления) или до N знаков?
-  - **✅ Решено:** отдавать **как есть, с полной точностью** `BigDecimal` (без принудительного округления итога). Внутренние деления — scale 12, `HALF_EVEN`.
+**On the formula and calculation:**
+- **Q1.** The formula line in the PDF is truncated. Please confirm the exact form: `(toRate / fromRate) × (1 − MAX(toSpread, fromSpread)/100)` — is the spread **subtracted**? And is it applied once (max of the two) rather than as the sum of both spreads? (The worked example implies exactly the subtraction of the max.)
+  - **✅ Resolved:** yes — the spread is **subtracted**, taking the **max** of the two (not the sum). Implemented in `SpreadCalculator`, covered by unit tests.
+- **Q2.** Fixer.io free returns rates **with EUR as the base only**. Do I compute the cross rate `from→to` as `toRate/fromRate` (both relative to EUR)? What if a pair is requested where one currency is missing on the required date?
+  - **✅ Resolved:** the cross rate is normalised to EUR (`toRatePerEUR / fromRatePerEUR`). If there is no rate for the date — the backend responds with **HTTP 404** (correct REST), and the frontend shows a message that no pair/data was found for the configuration. For a historical range without points — an empty `points: []` list and a UI message.
+- **Q3.** Rounding of the final `exchange`: how many digits, which rounding mode? In the example the value is stored at full precision — return it "as is" (no rounding) or to N digits?
+  - **✅ Resolved:** return it **as is, at full `BigDecimal` precision** (no forced rounding of the result). Internal divisions use scale 12, `HALF_EVEN`.
 
-**Про данные и Fixer.io:**
-- **Q4.** Есть ли уже API-ключ Fixer.io, или мне регистрировать свой? На free-плане недоступны historical endpoints и смена базы — ок ли, что историю накапливаем сами со дня запуска (для графика будет мало данных)? Или нужен сидинг/мок исторических данных для демо?
-  - **✅ Решено:** используем **free-plan** (свой ключ через `FIXER_API_KEY`); исторические данные **мокаем для демо** (детерминированный сидер `DemoDataSeeder`, флаг `app.seed.enabled`).
-- **Q5.** Какой набор валют собирать — все, что отдаёт Fixer, или фиксированный список?
-  - **✅ Решено:** только **основные валюты — EUR (база), USD, GBP, AED**. Ограничение задано `app.fixer.symbols` (запрос symbols к Fixer), тем же набором ограничены сидер и селекторы фронта.
+**On data and Fixer.io:**
+- **Q4.** Is there already a Fixer.io API key, or should I register my own? The free plan has no historical endpoints and no base switching — is it OK that we accumulate history ourselves from launch day (which means little data for the chart)? Or is seeding/mocking of historical data needed for the demo?
+  - **✅ Resolved:** we use the **free plan** (own key via `FIXER_API_KEY`); historical data is **mocked for the demo** (deterministic seeder `DemoDataSeeder`, flag `app.seed.enabled`).
+- **Q5.** Which set of currencies should be collected — everything Fixer returns, or a fixed list?
+  - **✅ Resolved:** only the **main currencies — EUR (base), USD, GBP, AED**. The restriction is configured via `app.fixer.symbols` (symbols request to Fixer); the seeder and the frontend selectors are limited to the same set.
 
-**Про AI/LLM:**
-- **Q6.** Есть ли предпочтение по инструменту (Spring AI vs LangChain4j) и по модели/провайдеру (Ollama локально vs OpenAI-совместимый endpoint)? Есть ли ограничения (нет доступа в интернет / нельзя внешние API)?
-- **Q7.** Какой AI-ассистент разработки использовать для evidence — Cursor (текущая среда), Claude Code, Copilot? От этого зависят конфиг-файлы (`.cursor/rules` и т.п.).
+**On AI/LLM:**
+- **Q6.** Is there a preference for the tool (Spring AI vs LangChain4j) and for the model/provider (Ollama locally vs an OpenAI-compatible endpoint)? Any constraints (no internet access / no external APIs allowed)?
+- **Q7.** Which AI development assistant should be used for evidence — Cursor (the current environment), Claude Code, Copilot? This determines the config files (`.cursor/rules`, etc.).
 
-**Про инфраструктуру и объём:**
-- **Q8.** Конкретная реляционная БД: достаточно H2 (in-memory для простоты запуска ревьюером) или нужен PostgreSQL/MySQL (docker-compose)?
-- **Q9.** Нужны ли аутентификация/авторизация, или это чисто внутренний открытый API?
-- **Q10.** Дедлайн по времени и ожидаемая глубина (MVP vs production-grade)? Это влияет на приоритезацию по рубрике.
-- **Q11.** Монорепо (backend + frontend в одном репозитории) или два отдельных репозитория?
-- **Q12.** Нужен ли Docker/`docker-compose` для полного локального запуска (БД + Ollama + backend + frontend) как часть оценки «setup instructions work»?
+**On infrastructure and scope:**
+- **Q8.** Specific relational DB: is H2 enough (in-memory for easy reviewer startup) or is PostgreSQL/MySQL needed (docker-compose)?
+- **Q9.** Is authentication/authorization needed, or is this a purely internal open API?
+- **Q10.** Time deadline and expected depth (MVP vs production-grade)? This affects prioritisation against the rubric.
+- **Q11.** Monorepo (backend + frontend in one repository) or two separate repositories?
+- **Q12.** Is Docker/`docker-compose` needed for a full local run (DB + Ollama + backend + frontend) as part of the "setup instructions work" evaluation?

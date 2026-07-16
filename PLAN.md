@@ -1,40 +1,40 @@
 # PLAN — Exchange Rate Management System
 
-> Планирующий артефакт, подготовленный с помощью AI-агента (Cursor) **до** начала реализации.
-> Основан на `Marcura_Assessment_FullStack.pdf` и разборе в `REQUIREMENTS.md`.
-> Живой документ: обновляется по мере продвижения и уточнения ответов на открытые вопросы.
+> Planning artefact prepared with an AI agent (Cursor) **before** implementation began.
+> Based on the assessment brief and the breakdown in `REQUIREMENTS.md`.
+> A living document: updated as work progresses and as answers to open questions are clarified.
 
-## 1. Цель и принципы
+## 1. Goal and principles
 
-Построить end-to-end систему курсов валют: backend (Spring Boot) + scheduler + Angular SPA + AI-инсайт по тренду.
-Ключевые принципы, вытекающие из рубрики:
+Build an end-to-end exchange rate system: backend (Spring Boot) + scheduler + Angular SPA + AI trend insight.
+Key principles derived from the rubric:
 
-- **Работающий end-to-end важнее переусложнения.** Простое, но цельное решение оценивается выше.
-- **AI-workflow = 25%** (наравне с backend). Планирование, конфиги, история коммитов `[AI]`, критическое использование — обязательны.
-- **Числовая корректность.** Все денежные расчёты — на `BigDecimal`, без `double`.
-- **Читаемая история коммитов** маленькими логическими шагами, AI-фазы с префиксом `[AI]`.
+- **A working end-to-end slice beats over-engineering.** A simple but complete solution scores higher.
+- **AI workflow = 25%** (on par with backend). Planning, config files, `[AI]` commit history, and critical usage are mandatory.
+- **Numerical correctness.** All monetary math uses `BigDecimal`, never `double`.
+- **A readable commit history** in small logical steps, with AI phases prefixed `[AI]`.
 
-## 2. Принятые допущения (defaults вместо ожидания ответов)
+## 2. Accepted assumptions (defaults instead of waiting for answers)
 
-Пока нет ответов на вопросы из `REQUIREMENTS.md` §11, работаем по этим defaults и фиксируем их в README «Assumptions»:
+Until the questions in `REQUIREMENTS.md` §11 are answered, we work with these defaults and record them in the README "Assumptions":
 
-| # | Вопрос | Принятое решение |
-|---|--------|------------------|
-| Q1 | Формула | ✅ Подтверждено: `(toRate / fromRate) × (1 − MAX(toSpread, fromSpread)/100)`, спред вычитается, берётся max из двух. |
-| Q2 | Кросс-курс | ✅ Подтверждено: `from→to = toRatePerEUR / fromRatePerEUR`. Если валюты нет на дату — **404**, фронт показывает «не найдено». Историч. диапазон без точек — `points: []`. |
-| Q3 | Округление | ✅ Подтверждено: отдавать как есть, с полной точностью `BigDecimal`. Внутренние деления — scale 12, `HALF_EVEN`. |
-| Q4 | Fixer.io | ✅ Подтверждено: free-ключ через env `FIXER_API_KEY`; исторические данные мокаем для демо (сидер, флаг `app.seed.enabled`). |
-| Q5 | Набор валют | ✅ Подтверждено: только основные — **EUR (база), USD, GBP, AED** (`app.fixer.symbols`); тем же ограничены сидер и селекторы фронта. |
-| Q6 | AI | Spring AI + Ollama (локальная модель, напр. `llama3.1` / `qwen2.5`). Провайдер конфигурируем через env. |
-| Q7 | AI-ассистент | Cursor (текущая среда) → конфиг в `.cursor/rules`. |
-| Q8 | БД | H2 (file/mem) по умолчанию — запуск ревьюером в один клик; профиль `postgres` + docker-compose как альтернатива. |
-| Q9 | Auth | Нет (внутренний открытый API), CORS открыт для dev. |
-| Q11 | Репозиторий | Монорепо: `backend/` + `frontend/`. |
-| Q12 | Docker | `docker-compose.yml` для полного локального запуска (Postgres + Ollama), но приложение запускается и без Docker (H2 + внешняя Ollama). |
+| # | Question | Accepted decision |
+|---|----------|-------------------|
+| Q1 | Formula | ✅ Confirmed: `(toRate / fromRate) × (1 − MAX(toSpread, fromSpread)/100)`, spread subtracted, max of the two taken. |
+| Q2 | Cross rate | ✅ Confirmed: `from→to = toRatePerEUR / fromRatePerEUR`. If a currency is missing on the date — **404**, the frontend shows "not found". A historical range without points — `points: []`. |
+| Q3 | Rounding | ✅ Confirmed: return it as is, at full `BigDecimal` precision. Internal divisions — scale 12, `HALF_EVEN`. |
+| Q4 | Fixer.io | ✅ Confirmed: free key via env `FIXER_API_KEY`; historical data mocked for the demo (seeder, flag `app.seed.enabled`). |
+| Q5 | Currency set | ✅ Confirmed: main currencies only — **EUR (base), USD, GBP, AED** (`app.fixer.symbols`); the seeder and frontend selectors are limited to the same set. |
+| Q6 | AI | Spring AI + Ollama (local model, e.g. `llama3.1` / `qwen2.5`). Provider configurable via env. |
+| Q7 | AI assistant | Cursor (the current environment) → config in `.cursor/rules`. |
+| Q8 | DB | H2 (file/mem) by default — one-click startup for the reviewer; a `postgres` profile + docker-compose as an alternative. |
+| Q9 | Auth | None (internal open API), CORS open for dev. |
+| Q11 | Repository | Monorepo: `backend/` + `frontend/`. |
+| Q12 | Docker | `docker-compose.yml` for a full local run (Postgres + Ollama), but the app also runs without Docker (H2 + external Ollama). |
 
-> Эти defaults не блокируют старт; при получении ответов корректируем.
+> These defaults do not block the start; we adjust them once answers arrive.
 
-## 3. Архитектура (высокоуровнево)
+## 3. Architecture (high level)
 
 ```
 Fixer.io ──(daily 12:05 GMT)──► Scheduler ──► RateService ──► [ DB: exchange_rate ]
@@ -46,23 +46,23 @@ Angular SPA ──HTTP──► REST Controllers ──► Services ┘         
                                      └──► Spring AI ChatClient ──► Ollama (LLM)
 ```
 
-### Backend слои
-- `web` — REST-контроллеры + DTO + обработка ошибок (`@RestControllerAdvice`).
-- `service` — бизнес-логика: расчёт спреда, сбор данных, аналитика, инсайт.
-- `domain` — JPA-сущности (`ExchangeRate`, `CurrencyUsage`).
+### Backend layers
+- `web` — REST controllers + DTOs + error handling (`@RestControllerAdvice`).
+- `service` — business logic: spread calculation, data collection, analytics, insight.
+- `domain` — JPA entities (`ExchangeRate`, `CurrencyUsage`).
 - `repository` — Spring Data JPA + named queries.
-- `client` — интеграция с Fixer.io (`RestClient`/`WebClient`).
-- `ai` — обвязка Spring AI (ChatClient, промпты).
-- `scheduler` — `@Scheduled` задача + распределённая блокировка.
-- `config` — spread-конфиг, CORS, OpenAPI, планировщик.
+- `client` — Fixer.io integration (`RestClient`/`WebClient`).
+- `ai` — Spring AI wiring (ChatClient, prompts).
+- `scheduler` — `@Scheduled` task + distributed lock.
+- `config` — spread config, CORS, OpenAPI, scheduler.
 
-### Модель данных
+### Data model
 - `exchange_rate(id, currency_code, rate, rate_date, base_currency, created_at)`
-  - уникальность: `(currency_code, rate_date)` → основа для upsert.
+  - uniqueness: `(currency_code, rate_date)` → the basis for upsert.
 - `currency_usage(currency_code PK, query_count, last_queried_date)`
-  - инкремент атомарным UPDATE-запросом (не read-modify-write).
+  - incremented via an atomic UPDATE query (not read-modify-write).
 
-## 4. Расчёт спреда
+## 4. Spread calculation
 
 ```
 spread(ccy):
@@ -74,73 +74,73 @@ spread(ccy):
 
 rate(from,to,date) = (toRatePerEUR / fromRatePerEUR) * (1 - MAX(spread(from),spread(to))/100)
 ```
-- Реализация: `SpreadCalculator` (чистый класс, легко тестируется), спреды из `application.yml` → `@ConfigurationProperties`.
-- Тесты: worked example EUR→PLN = 4.44…, границы групп спредов, base=0%.
+- Implementation: `SpreadCalculator` (a pure class, easy to test), spreads from `application.yml` → `@ConfigurationProperties`.
+- Tests: worked example EUR→PLN = 4.44…, spread group boundaries, base = 0%.
 
-## 5. Конкурентность и multi-instance
+## 5. Concurrency and multi-instance
 
-- **Счётчики:** атомарный `@Modifying` UPDATE (`UPDATE ... SET count = count + 1`), не загрузка сущности в память. Инкремент обеих валют в одной транзакции.
-- **Scheduler в нескольких инстансах:** ShedLock (JdbcTemplate lock provider) — только один инстанс выполняет задачу в окне. Обоснование в README (простота + надёжность vs выбор лидера/внешний оркестратор).
-- **Upsert:** уникальный индекс `(currency_code, rate_date)` + обработка конфликта (insert-or-update), идемпотентность повторного запуска за тот же день.
+- **Counters:** an atomic `@Modifying` UPDATE (`UPDATE ... SET count = count + 1`), not loading the entity into memory. Both currencies incremented in one transaction.
+- **Scheduler across multiple instances:** ShedLock (JdbcTemplate lock provider) — only one instance runs the task within the window. Rationale in the README (simplicity + reliability vs leader election / external orchestrator).
+- **Upsert:** unique index `(currency_code, rate_date)` + conflict handling (insert-or-update), idempotency of re-running for the same day.
 
-## 6. AI-инсайт (Spring AI)
+## 6. AI insight (Spring AI)
 
 - `ChatClient` (Spring AI) → Ollama.
-- Prompt: system-промпт ограничивает вывод 1–2 предложениями, только по данным; user-промпт содержит **реальные пары (дата, курс)** за период.
-- Эндпоинт `GET /exchange/insight?from&to&fromDate&toDate`.
-- Кэш инсайта по ключу (from,to,fromDate,toDate) — чтобы не дёргать LLM повторно (опц.).
-- Fallback: если LLM недоступен — понятная ошибка/деградация, фронт показывает сообщение.
+- Prompt: the system prompt constrains the output to 1–2 sentences, based only on the data; the user prompt contains **real (date, rate) pairs** for the period.
+- Endpoint `GET /exchange/insight?from&to&fromDate&toDate`.
+- Insight cache keyed on (from,to,fromDate,toDate) — to avoid calling the LLM repeatedly (optional).
+- Fallback: if the LLM is unavailable — a clear error/degradation, the frontend shows a message.
 
 ## 7. Frontend (Angular)
 
-- Standalone-компоненты, роутинг на 3 вкладки, типизированные модели, `HttpClient` + interceptors (loading/error).
-- `environment.ts` / `environment.development.ts` → `apiBaseUrl` из env.
-- Вкладки:
-  1. **Calculator** — reactive form, валидация, loading, обработка 404.
-  2. **Historical** — выбор пары + диапазона, таблица + линейный график (ng2-charts/Chart.js), панель AI-инсайта с loading.
-  3. **Analytics** — визуализация usage (топ валют, даты).
-- Сервисный слой (`ExchangeApiService`) с типами DTO, соответствующими backend.
+- Standalone components, routing across 3 tabs, typed models, `HttpClient` + interceptors (loading/error).
+- `environment.ts` / `environment.development.ts` → `apiBaseUrl` from env.
+- Tabs:
+  1. **Calculator** — reactive form, validation, loading, 404 handling.
+  2. **Historical** — pair + range selection, table + line chart (ng2-charts/Chart.js), AI insight panel with loading.
+  3. **Analytics** — usage visualisation (top currencies, dates).
+- A service layer (`ExchangeApiService`) with DTO types matching the backend.
 
-## 8. Тестирование
+## 8. Testing
 
-- Backend: JUnit5 + Mockito. Обязательно: unit-тесты `SpreadCalculator`; интеграционный тест `/exchange` (MockMvc + H2). Тест атомарности счётчика. Тест upsert-идемпотентности.
-- Frontend: базовые component/service specs (Jasmine/Karma).
-- Тестовые сюиты генерируем с AI, затем ревьюим/правим (фиксируем пример правки в README «AI Workflow»).
+- Backend: JUnit5 + Mockito. Required: unit tests for `SpreadCalculator`; an integration test for `/exchange` (MockMvc + H2). A counter atomicity test. An upsert idempotency test.
+- Frontend: basic component/service specs (Jasmine/Karma).
+- Test suites are generated with AI, then reviewed/fixed (an example fix is recorded in the README "AI Workflow").
 
-## 9. Документация и сдача
+## 9. Documentation and submission
 
-- Swagger UI (`springdoc-openapi`) — все эндпоинты.
-- README: setup/run (с Docker и без), архитектура, «AI Workflow», assumptions, trade-offs.
-- Запись экрана 3–5 мин: работающее приложение + сессия AI-агента.
+- Swagger UI (`springdoc-openapi`) — all endpoints.
+- README: setup/run (with and without Docker), architecture, "AI Workflow", assumptions, trade-offs.
+- A 3–5 min screen recording: the working application + an AI-agent session.
 
-## 10. Порядок работ (итерации / коммиты)
+## 10. Work order (iterations / commits)
 
-1. [x] `[AI]` Планирование: PLAN.md, .cursor/rules, скелет репо, README-скелет.
+1. [x] `[AI]` Planning: PLAN.md, .cursor/rules, repo skeleton, README skeleton.
 2. [x] Backend bootstrap: pom, application.yml, main class, H2, Swagger, health (actuator).
-3. [x] Домен + репозитории + миграция схемы (уникальный индекс).
-4. [x] Fixer client + scheduler + ShedLock + upsert + сидер для демо.
-5. [x] `SpreadCalculator` + `/exchange` + счётчики (атомарно) + тесты формулы/интеграции/конкуренции.
-6. [x] `/analytics` + тест.
+3. [x] Domain + repositories + schema migration (unique index).
+4. [x] Fixer client + scheduler + ShedLock + upsert + demo seeder.
+5. [x] `SpreadCalculator` + `/exchange` + counters (atomic) + formula/integration/concurrency tests.
+6. [x] `/analytics` + test.
 7. [x] Spring AI + Ollama + `/exchange/insight` + prompt design.
-8. [x] Frontend bootstrap, env-конфиг, API-сервис, роутинг.
-9. [x] Вкладка Calculator.
-10. [x] Вкладка Historical + график + панель инсайта.
-11. [x] Вкладка Analytics.
-12. [~] Polishing: README финал ✔, Swagger ✔, покрытие тестами ✔;
-    сборка/тесты backend прогнаны локально (JDK 17 + Maven 3.9.11) — **BUILD SUCCESS, 12/12 тестов зелёные** ✔;
-    Maven wrapper (`mvnw`) добавлен ✔;
-    frontend собран и протестирован локально (Node 22 + Angular 18) — **build OK, 7/7 specs зелёные** ✔;
-    запись экрана — pending (ручной шаг).
+8. [x] Frontend bootstrap, env config, API service, routing.
+9. [x] Calculator tab.
+10. [x] Historical tab + chart + insight panel.
+11. [x] Analytics tab.
+12. [~] Polishing: README finalised ✔, Swagger ✔, test coverage ✔;
+    backend build/tests run locally (JDK 17 + Maven 3.9.11) — **BUILD SUCCESS, all tests green** ✔;
+    Maven wrapper (`mvnw`) added ✔;
+    frontend built and tested locally (Node 22 + Angular 18) — **build OK, all specs green** ✔;
+    screen recording — pending (manual step).
 
-Каждая AI-ассистированная фаза → коммит с префиксом `[AI]`.
+Each AI-assisted phase → a commit prefixed `[AI]`.
 
-## 11. Риски / trade-offs
+## 11. Risks / trade-offs
 
-- **Fixer free = только EUR-база и без historical.** → историю копим сами + сидер для демо; в README честно указать ограничение.
-- **Ollama требует локальной модели** (вес/время загрузки). → в README точные команды `ollama pull`; провайдер конфигурируем, чтобы можно было переключить на OpenAI-совместимый endpoint.
-- **H2 vs Postgres** — H2 упрощает запуск, но ShedLock/upsert проверяем и на Postgres (профиль + docker-compose).
-- **Время.** Приоритет по рубрике: backend correctness + AI workflow evidence в первую очередь.
+- **Fixer free = EUR base only and no historical.** → we accumulate history ourselves + a seeder for the demo; the README states the limitation honestly.
+- **Ollama requires a local model** (size/download time). → the README gives exact `ollama pull` commands; the provider is configurable so it can be switched to an OpenAI-compatible endpoint.
+- **H2 vs Postgres** — H2 simplifies startup, but ShedLock/upsert are also verified on Postgres (profile + docker-compose).
+- **Time.** Prioritisation per the rubric: backend correctness + AI workflow evidence first.
 
-## 12. Открытые вопросы
+## 12. Open questions
 
-Список ведётся в `REQUIREMENTS.md` §11 (Q1–Q12). До получения ответов действуют defaults из §2 этого плана.
+The list is maintained in `REQUIREMENTS.md` §11 (Q1–Q12). Until answers arrive, the defaults from §2 of this plan apply.

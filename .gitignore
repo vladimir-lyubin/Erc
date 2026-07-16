@@ -30,3 +30,6 @@ Thumbs.db
 # Extracted PDF working files
 pdf_raw.txt
 pdf_text.txt
+
+# Assessment brief (kept out of the repo)
+Marcura_Assessment_FullStack.pdf
