@@ -1,14 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ChartConfiguration } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
-import { CURRENCIES } from '../../core/currencies';
-import {
-  HistoricalRatesResponse,
-  InsightResponse,
-} from '../../core/models/exchange.models';
-import { ExchangeApiService } from '../../core/services/exchange-api.service';
+import { catchError, of } from 'rxjs';
+import { HistoricalRatesResponse, InsightResponse } from '@core/models';
+import { ExchangeApiService } from '@core/services';
+import { isoDaysAgo, isoToday } from '@core/utils/date.util';
+import { RequestState } from '@core/utils/request-state';
+import { LINE_CHART_OPTIONS, toLineChartData } from '@shared/charts/chart-theme';
+import { CurrencySelectComponent } from '@shared/ui/currency-select/currency-select.component';
 
 /**
  * Historical view: pick a pair + date range, then show the raw-rates table and a line chart side by
@@ -17,38 +17,24 @@ import { ExchangeApiService } from '../../core/services/exchange-api.service';
 @Component({
   selector: 'app-historical',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, BaseChartDirective],
+  imports: [CommonModule, ReactiveFormsModule, BaseChartDirective, CurrencySelectComponent],
   templateUrl: './historical.component.html',
 })
 export class HistoricalComponent {
   private readonly api = inject(ExchangeApiService);
   private readonly fb = inject(FormBuilder);
 
-  readonly currencies = CURRENCIES;
+  readonly history = new RequestState<HistoricalRatesResponse>();
+  readonly insight = new RequestState<InsightResponse>();
 
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
-  readonly history = signal<HistoricalRatesResponse | null>(null);
-
-  readonly insightLoading = signal(false);
-  readonly insight = signal<InsightResponse | null>(null);
-
-  readonly chartData = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
-  readonly chartOptions: ChartConfiguration<'line'>['options'] = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: true } },
-    scales: { y: { beginAtZero: false } },
-  };
-
-  private readonly today = new Date().toISOString().slice(0, 10);
-  private readonly monthAgo = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
+  readonly chartOptions = LINE_CHART_OPTIONS;
+  readonly chartData = computed(() => toLineChartData(this.history.value()));
 
   readonly form = this.fb.nonNullable.group({
     from: ['EUR', Validators.required],
-    to: ['PLN', Validators.required],
-    fromDate: [this.monthAgo, Validators.required],
-    toDate: [this.today, Validators.required],
+    to: ['USD', Validators.required],
+    fromDate: [isoDaysAgo(29), Validators.required],
+    toDate: [isoToday(), Validators.required],
   });
 
   submit(): void {
@@ -58,53 +44,26 @@ export class HistoricalComponent {
     }
     const { from, to, fromDate, toDate } = this.form.getRawValue();
     if (fromDate > toDate) {
-      this.error.set('"From" date must not be after "To" date.');
+      this.history.error.set('"From" date must not be after "To" date.');
       return;
     }
 
-    this.loading.set(true);
-    this.error.set(null);
-    this.history.set(null);
-    this.insight.set(null);
-
-    this.api.getHistorical(from, to, fromDate, toDate).subscribe({
-      next: (res) => {
-        this.history.set(res);
-        this.chartData.set({
-          labels: res.points.map((p) => p.date),
-          datasets: [
-            {
-              data: res.points.map((p) => p.rate),
-              label: `${from}/${to}`,
-              borderColor: '#2e86de',
-              backgroundColor: 'rgba(46, 134, 222, 0.15)',
-              fill: true,
-              tension: 0.25,
-              pointRadius: 2,
-            },
-          ],
-        });
-        this.loading.set(false);
-        this.loadInsight(from, to, fromDate, toDate);
-      },
-      error: (err) => {
-        this.error.set(err?.message ?? 'Failed to load historical rates.');
-        this.loading.set(false);
-      },
-    });
+    this.insight.clear();
+    this.history.run(this.api.getHistorical(from, to, fromDate, toDate), () =>
+      this.loadInsight(from, to, fromDate, toDate),
+    );
   }
 
   private loadInsight(from: string, to: string, fromDate: string, toDate: string): void {
-    this.insightLoading.set(true);
-    this.api.getInsight(from, to, fromDate, toDate).subscribe({
-      next: (res) => {
-        this.insight.set(res);
-        this.insightLoading.set(false);
-      },
-      error: () => {
-        this.insight.set({ from, to, fromDate, toDate, insight: 'Trend insight is unavailable right now.' });
-        this.insightLoading.set(false);
-      },
-    });
+    const fallback: InsightResponse = {
+      from,
+      to,
+      fromDate,
+      toDate,
+      insight: 'Trend insight is unavailable right now.',
+    };
+    this.insight.run(
+      this.api.getInsight(from, to, fromDate, toDate).pipe(catchError(() => of(fallback))),
+    );
   }
 }

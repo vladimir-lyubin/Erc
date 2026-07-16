@@ -2,6 +2,7 @@ package com.marcura.exchangerate.service.impl;
 
 import com.marcura.exchangerate.service.ExchangeRateService;
 import com.marcura.exchangerate.service.TrendInsightService;
+import com.marcura.exchangerate.util.CurrencyUtils;
 import com.marcura.exchangerate.web.dto.HistoricalRatesResponse;
 import com.marcura.exchangerate.web.dto.InsightResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,8 @@ public class TrendInsightServiceImpl implements TrendInsightService {
         String insight = history.points().isEmpty()
                 ? "No rate data is available for %s/%s in the selected period.".formatted(from, to)
                 : askModel(from, to, history);
-        return new InsightResponse(from.toUpperCase(), to.toUpperCase(), fromDate, toDate, insight);
+        return new InsightResponse(CurrencyUtils.normalize(from), CurrencyUtils.normalize(to),
+                fromDate, toDate, insight);
     }
 
     private String askModel(String from, String to, HistoricalRatesResponse history) {

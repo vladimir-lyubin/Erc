@@ -12,10 +12,18 @@ import java.util.List;
 public record AppProperties(Fixer fixer, Seed seed) {
 
     /**
-     * @param symbols non-base currencies to request from Fixer (EUR is the free-plan base and is
-     *                always stored implicitly with rate 1). Empty means "all currencies Fixer returns".
+     * @param symbols          non-base currencies to request from Fixer (EUR is the free-plan base and is
+     *                         always stored implicitly with rate 1). Empty means "all currencies Fixer returns".
+     * @param connectTimeoutMs TCP connect timeout for the Fixer HTTP client, in milliseconds
+     * @param readTimeoutMs    socket read timeout for the Fixer HTTP client, in milliseconds
+     * @param maxAttempts      total attempts (initial call + retries) for a transient failure
      */
-    public record Fixer(String baseUrl, String apiKey, List<String> symbols) {
+    public record Fixer(String baseUrl,
+                        String apiKey,
+                        List<String> symbols,
+                        int connectTimeoutMs,
+                        int readTimeoutMs,
+                        int maxAttempts) {
         public boolean hasApiKey() {
             return apiKey != null && !apiKey.isBlank();
         }

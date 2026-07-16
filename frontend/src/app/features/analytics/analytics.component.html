@@ -1,15 +1,15 @@
 <section class="card">
   <h2>Usage Analytics</h2>
   <p class="muted">How often each currency has been involved in a rate query.</p>
-  @if (loading()) {
+  @if (request.loading()) {
     <p class="muted">Loading…</p>
   }
-  @if (error(); as err) {
+  @if (request.error(); as err) {
     <p class="error">{{ err }}</p>
   }
 </section>
 
-@if (!loading() && !error()) {
+@if (!request.loading() && !request.error()) {
   @if (stats().length === 0) {
     <section class="card">
       <p class="muted">No usage recorded yet. Run a few calculations first.</p>

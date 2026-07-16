@@ -1,13 +1,13 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { environment } from '@env';
 import {
   AnalyticsResponse,
   ExchangeResponse,
   HistoricalRatesResponse,
   InsightResponse,
-} from '../models/exchange.models';
+} from '@core/models';
 
 /**
  * Single owner of all HTTP calls to the backend. Components consume this service and never
@@ -32,12 +32,9 @@ export class ExchangeApiService {
     fromDate: string,
     toDate: string,
   ): Observable<HistoricalRatesResponse> {
-    const params = new HttpParams()
-      .set('from', from)
-      .set('to', to)
-      .set('fromDate', fromDate)
-      .set('toDate', toDate);
-    return this.http.get<HistoricalRatesResponse>(`${this.baseUrl}/exchange/historical`, { params });
+    return this.http.get<HistoricalRatesResponse>(`${this.baseUrl}/exchange/historical`, {
+      params: this.rangeParams(from, to, fromDate, toDate),
+    });
   }
 
   getInsight(
@@ -46,15 +43,21 @@ export class ExchangeApiService {
     fromDate: string,
     toDate: string,
   ): Observable<InsightResponse> {
-    const params = new HttpParams()
-      .set('from', from)
-      .set('to', to)
-      .set('fromDate', fromDate)
-      .set('toDate', toDate);
-    return this.http.get<InsightResponse>(`${this.baseUrl}/exchange/insight`, { params });
+    return this.http.get<InsightResponse>(`${this.baseUrl}/exchange/insight`, {
+      params: this.rangeParams(from, to, fromDate, toDate),
+    });
   }
 
   getAnalytics(): Observable<AnalyticsResponse> {
     return this.http.get<AnalyticsResponse>(`${this.baseUrl}/analytics`);
+  }
+
+  /** Shared query params for the pair + date-range endpoints (historical and insight). */
+  private rangeParams(from: string, to: string, fromDate: string, toDate: string): HttpParams {
+    return new HttpParams()
+      .set('from', from)
+      .set('to', to)
+      .set('fromDate', fromDate)
+      .set('toDate', toDate);
   }
 }

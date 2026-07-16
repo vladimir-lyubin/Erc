@@ -14,10 +14,12 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Seeds a deterministic history of synthetic rates on first run, so the frontend chart and analytics
@@ -44,29 +46,35 @@ public class DemoDataSeeder implements ApplicationRunner {
             return;
         }
         int days = properties.seed().days();
-        LocalDate start = LocalDate.now().minusDays(days - 1L);
+        LocalDate startDate = LocalDate.now().minusDays(days - 1L);
         Random random = new Random(42); // deterministic
-        List<ExchangeRate> batch = new ArrayList<>();
 
-        for (int d = 0; d < days; d++) {
-            final int day = d;
-            LocalDate date = start.plusDays(day);
-            batch.add(new ExchangeRate(BASE, BigDecimal.ONE, date, BASE));
-            START_RATES.forEach((code, startRate) -> {
-                double drift = 1 + (random.nextDouble() - 0.5) * 0.02; // +/-1% daily walk
-                double value = startRate * Math.pow(drift, day + 1d);
-                batch.add(new ExchangeRate(code,
-                        BigDecimal.valueOf(value).setScale(12, RoundingMode.HALF_EVEN), date, BASE));
-            });
-        }
-        rateRepository.saveAll(batch);
+        List<ExchangeRate> rates = IntStream.range(0, days)
+                .mapToObj(startDate::plusDays)
+                .flatMap(date -> ratesForDay(date, startDate, random))
+                .toList();
+        rateRepository.saveAll(rates);
 
         // Pre-create usage counters so /exchange increments are a pure atomic UPDATE.
-        List<CurrencyUsage> counters = new ArrayList<>();
-        counters.add(new CurrencyUsage(BASE));
-        START_RATES.keySet().forEach(code -> counters.add(new CurrencyUsage(code)));
+        List<CurrencyUsage> counters = Stream.concat(Stream.of(BASE), START_RATES.keySet().stream())
+                .map(CurrencyUsage::new)
+                .toList();
         usageRepository.saveAll(counters);
 
-        log.info("Seeded {} synthetic rate rows across {} days", batch.size(), days);
+        log.info("Seeded {} synthetic rate rows across {} days", rates.size(), days);
+    }
+
+    /** Rates for a single day: the base currency at 1, plus a synthetic random-walk value per currency. */
+    private Stream<ExchangeRate> ratesForDay(LocalDate date, LocalDate startDate, Random random) {
+        long dayOffset = ChronoUnit.DAYS.between(startDate, date);
+        Stream<ExchangeRate> baseRate = Stream.of(new ExchangeRate(BASE, BigDecimal.ONE, date, BASE));
+        Stream<ExchangeRate> currencyRates = START_RATES.entrySet().stream()
+                .map(entry -> {
+                    double drift = 1 + (random.nextDouble() - 0.5) * 0.02; // +/-1% daily walk
+                    double value = entry.getValue() * Math.pow(drift, dayOffset + 1d);
+                    BigDecimal rate = BigDecimal.valueOf(value).setScale(12, RoundingMode.HALF_EVEN);
+                    return new ExchangeRate(entry.getKey(), rate, date, BASE);
+                });
+        return Stream.concat(baseRate, currencyRates);
     }
 }

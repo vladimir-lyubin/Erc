@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { ChartConfiguration } from 'chart.js';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { BaseChartDirective } from 'ng2-charts';
-import { CurrencyStat } from '../../core/models/exchange.models';
-import { ExchangeApiService } from '../../core/services/exchange-api.service';
+import { AnalyticsResponse } from '@core/models';
+import { ExchangeApiService } from '@core/services';
+import { RequestState } from '@core/utils/request-state';
+import { BAR_CHART_OPTIONS, toBarChartData } from '@shared/charts/chart-theme';
 
 /**
  * Analytics dashboard: surfaces which currencies are queried most often and when they were last
@@ -18,44 +19,17 @@ import { ExchangeApiService } from '../../core/services/exchange-api.service';
 export class AnalyticsComponent implements OnInit {
   private readonly api = inject(ExchangeApiService);
 
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
-  readonly stats = signal<CurrencyStat[]>([]);
+  readonly request = new RequestState<AnalyticsResponse>();
 
-  readonly chartData = signal<ChartConfiguration<'bar'>['data']>({ labels: [], datasets: [] });
-  readonly chartOptions: ChartConfiguration<'bar'>['options'] = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-  };
+  readonly stats = computed(() => this.request.value()?.topCurrencies ?? []);
+  readonly chartOptions = BAR_CHART_OPTIONS;
+  readonly chartData = computed(() => toBarChartData(this.stats()));
 
   ngOnInit(): void {
     this.load();
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set(null);
-    this.api.getAnalytics().subscribe({
-      next: (res) => {
-        this.stats.set(res.topCurrencies);
-        this.chartData.set({
-          labels: res.topCurrencies.map((s) => s.currency),
-          datasets: [
-            {
-              data: res.topCurrencies.map((s) => s.totalCount),
-              label: 'Query count',
-              backgroundColor: '#1e3d6b',
-            },
-          ],
-        });
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(err?.message ?? 'Failed to load analytics.');
-        this.loading.set(false);
-      },
-    });
+    this.request.run(this.api.getAnalytics());
   }
 }

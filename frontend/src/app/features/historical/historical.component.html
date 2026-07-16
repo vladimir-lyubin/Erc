@@ -2,22 +2,8 @@
   <h2>Historical Rates &amp; Trend</h2>
 
   <form [formGroup]="form" (ngSubmit)="submit()">
-    <label>
-      From
-      <select formControlName="from">
-        @for (c of currencies; track c) {
-          <option [value]="c">{{ c }}</option>
-        }
-      </select>
-    </label>
-    <label>
-      To
-      <select formControlName="to">
-        @for (c of currencies; track c) {
-          <option [value]="c">{{ c }}</option>
-        }
-      </select>
-    </label>
+    <app-currency-select label="From" controlName="from" />
+    <app-currency-select label="To" controlName="to" />
     <label>
       From date
       <input type="date" formControlName="fromDate" />
@@ -26,17 +12,17 @@
       To date
       <input type="date" formControlName="toDate" />
     </label>
-    <button type="submit" [disabled]="loading()">
-      {{ loading() ? 'Loading…' : 'Show' }}
+    <button type="submit" [disabled]="history.loading()">
+      {{ history.loading() ? 'Loading…' : 'Show' }}
     </button>
   </form>
 
-  @if (error(); as err) {
+  @if (history.error(); as err) {
     <p class="error">{{ err }}</p>
   }
 </section>
 
-@if (history(); as data) {
+@if (history.value(); as data) {
   <div class="two-col">
     <section class="card">
       <h3>Rates</h3>
@@ -72,10 +58,10 @@
 
   <section class="card">
     <h3>AI Trend Insight</h3>
-    @if (insightLoading()) {
+    @if (insight.loading()) {
       <p class="muted">Generating insight…</p>
     } @else {
-      @if (insight(); as ins) {
+      @if (insight.value(); as ins) {
         <p class="insight">{{ ins.insight }}</p>
       }
     }

@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { CURRENCIES } from '../../core/currencies';
-import { ExchangeResponse } from '../../core/models/exchange.models';
-import { ExchangeApiService } from '../../core/services/exchange-api.service';
+import { ExchangeResponse } from '@core/models';
+import { ExchangeApiService } from '@core/services';
+import { RequestState } from '@core/utils/request-state';
+import { CurrencySelectComponent } from '@shared/ui/currency-select/currency-select.component';
 
 /**
  * Calculator view: pick two currencies + optional date, show the spread-adjusted rate.
@@ -12,18 +13,14 @@ import { ExchangeApiService } from '../../core/services/exchange-api.service';
 @Component({
   selector: 'app-calculator',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, CurrencySelectComponent],
   templateUrl: './calculator.component.html',
 })
 export class CalculatorComponent {
   private readonly api = inject(ExchangeApiService);
   private readonly fb = inject(FormBuilder);
 
-  readonly currencies = CURRENCIES;
-
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
-  readonly result = signal<ExchangeResponse | null>(null);
+  readonly request = new RequestState<ExchangeResponse>();
 
   readonly form = this.fb.nonNullable.group({
     from: ['EUR', Validators.required],
@@ -37,18 +34,6 @@ export class CalculatorComponent {
       return;
     }
     const { from, to, date } = this.form.getRawValue();
-    this.loading.set(true);
-    this.error.set(null);
-    this.result.set(null);
-    this.api.getExchange(from, to, date || undefined).subscribe({
-      next: (res) => {
-        this.result.set(res);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(err?.message ?? 'Failed to fetch rate.');
-        this.loading.set(false);
-      },
-    });
+    this.request.run(this.api.getExchange(from, to, date || undefined));
   }
 }

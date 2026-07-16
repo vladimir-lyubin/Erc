@@ -54,6 +54,16 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Declarative retry (@Retryable/@Recover) for transient Fixer.io failures; needs AOP for the proxy -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- AI: Spring AI + Ollama (GA starter naming; swap for spring-ai-starter-model-openai if needed) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

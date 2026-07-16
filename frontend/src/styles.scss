@@ -25,10 +25,11 @@ body {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2rem;
-  padding: 0 1.5rem;
-  height: 56px;
+  gap: 0.5rem 2rem;
+  padding: 0.5rem 1.5rem;
+  min-height: 56px;
   background: var(--brand);
   color: #fff;
 
@@ -39,7 +40,8 @@ body {
 
   nav {
     display: flex;
-    gap: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
 
     a {
       color: rgba(255, 255, 255, 0.8);
@@ -53,6 +55,12 @@ body {
         border-bottom-color: #fff;
       }
     }
+  }
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 }
 
@@ -169,4 +177,37 @@ table {
   font-size: 1.6rem;
   font-weight: 600;
   color: var(--brand);
+}
+
+@media (max-width: 480px) {
+  .content {
+    margin: 1rem auto;
+    padding: 0 1rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  // Stack form fields full-width on phones (flex children stretch on the cross axis).
+  form {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  // Let wide tables scroll horizontally instead of overflowing the viewport.
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .result-value {
+    font-size: 1.35rem;
+  }
 }

@@ -1,6 +1,7 @@
 package com.marcura.exchangerate.service;
 
 import com.marcura.exchangerate.config.SpreadProperties;
+import com.marcura.exchangerate.util.CurrencyUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -31,7 +32,7 @@ public class SpreadCalculator {
         this.defaultSpread = new BigDecimal(properties.defaultPercent());
         properties.groups().forEach((percent, currencies) -> {
             BigDecimal spread = new BigDecimal(percent);
-            currencies.forEach(code -> currencyToSpread.put(code.toUpperCase(), spread));
+            currencies.forEach(code -> currencyToSpread.put(CurrencyUtils.normalize(code), spread));
         });
     }
 
@@ -40,7 +41,7 @@ public class SpreadCalculator {
         if (currency.equalsIgnoreCase(baseCurrency)) {
             return BigDecimal.ZERO;
         }
-        return currencyToSpread.getOrDefault(currency.toUpperCase(), defaultSpread);
+        return currencyToSpread.getOrDefault(CurrencyUtils.normalize(currency), defaultSpread);
     }
 
     /**

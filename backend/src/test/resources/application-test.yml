@@ -14,3 +14,8 @@ app:
   fixer:
     base-url: http://localhost:9999
     api-key: ""
+    connect-timeout-ms: 500
+    read-timeout-ms: 500
+    max-attempts: 2
+    retry-backoff-ms: 10
+    retry-multiplier: 2

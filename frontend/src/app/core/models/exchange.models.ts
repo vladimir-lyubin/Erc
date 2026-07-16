@@ -39,3 +39,9 @@ export interface InsightResponse {
   toDate: string;
   insight: string;
 }
+
+/** Normalised error shape produced by the HTTP error interceptor and consumed by components. */
+export interface AppError {
+  message: string;
+  status?: number;
+}

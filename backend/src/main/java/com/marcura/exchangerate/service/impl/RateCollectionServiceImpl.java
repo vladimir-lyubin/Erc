@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -30,14 +31,17 @@ public class RateCollectionServiceImpl implements RateCollectionService {
     @Transactional
     public int collectAndUpsert() {
         FixerRates rates = fixerClient.fetchLatest();
-        int upserted = 0;
 
-        // The base currency itself is stored with rate 1 so base->X queries resolve.
-        upserted += upsert(rates.base(), BigDecimal.ONE, rates.rateDate(), rates.base());
+        // Store the base currency with rate 1 (so base->X queries resolve) alongside the fetched rates,
+        // then upsert everything in a single pass.
+        Map<String, BigDecimal> ratesToStore = new LinkedHashMap<>();
+        ratesToStore.put(rates.base(), BigDecimal.ONE);
+        ratesToStore.putAll(rates.ratesByCode());
 
-        for (Map.Entry<String, BigDecimal> entry : rates.ratesByCode().entrySet()) {
-            upserted += upsert(entry.getKey(), entry.getValue(), rates.rateDate(), rates.base());
-        }
+        int upserted = ratesToStore.entrySet().stream()
+                .mapToInt(entry -> upsert(entry.getKey(), entry.getValue(), rates.rateDate(), rates.base()))
+                .sum();
+
         log.info("Upserted {} rates for {}", upserted, rates.rateDate());
         return upserted;
     }

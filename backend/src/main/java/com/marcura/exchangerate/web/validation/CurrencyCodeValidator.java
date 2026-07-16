@@ -1,5 +1,6 @@
 package com.marcura.exchangerate.web.validation;
 
+import com.marcura.exchangerate.util.CurrencyUtils;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
@@ -21,6 +22,6 @@ public class CurrencyCodeValidator implements ConstraintValidator<CurrencyCode, 
         if (value == null) {
             return true; // null-ness is handled by @NotNull where required
         }
-        return ISO_CODES.contains(value.toUpperCase());
+        return ISO_CODES.contains(CurrencyUtils.normalize(value));
     }
 }

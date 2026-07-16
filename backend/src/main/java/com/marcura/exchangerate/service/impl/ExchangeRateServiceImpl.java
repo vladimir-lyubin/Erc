@@ -7,6 +7,7 @@ import com.marcura.exchangerate.repository.CurrencyUsageRepository;
 import com.marcura.exchangerate.repository.ExchangeRateRepository;
 import com.marcura.exchangerate.service.ExchangeRateService;
 import com.marcura.exchangerate.service.SpreadCalculator;
+import com.marcura.exchangerate.util.CurrencyUtils;
 import com.marcura.exchangerate.web.dto.ExchangeResponse;
 import com.marcura.exchangerate.web.dto.HistoricalRatesResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +35,8 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
     @Override
     @Transactional
     public ExchangeResponse getExchange(String from, String to, LocalDate date) {
-        String fromCcy = from.toUpperCase();
-        String toCcy = to.toUpperCase();
+        String fromCcy = CurrencyUtils.normalize(from);
+        String toCcy = CurrencyUtils.normalize(to);
 
         LocalDate effectiveDate = date != null
                 ? date
@@ -58,8 +59,8 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
     @Override
     @Transactional(readOnly = true)
     public HistoricalRatesResponse getHistorical(String from, String to, LocalDate fromDate, LocalDate toDate) {
-        String fromCcy = from.toUpperCase();
-        String toCcy = to.toUpperCase();
+        String fromCcy = CurrencyUtils.normalize(from);
+        String toCcy = CurrencyUtils.normalize(to);
 
         Map<LocalDate, ExchangeRate> fromByDate = indexByDate(
                 rateRepository.findByCurrencyCodeAndRateDateBetweenOrderByRateDateAsc(fromCcy, fromDate, toDate));

@@ -1,7 +1,7 @@
 package com.marcura.exchangerate.web;
 
 import com.marcura.exchangerate.exception.RateNotFoundException;
-import jakarta.validation.ConstraintViolation;
+import com.marcura.exchangerate.util.ValidationMessageUtils;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -9,8 +9,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-
-import java.util.stream.Collectors;
 
 /**
  * Single place where every exception thrown by a controller is turned into a consistent RFC-7807
@@ -30,9 +28,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     /** Bean Validation failures on {@code @RequestParam}/path params (e.g. an invalid currency code). */
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
-        String detail = ex.getConstraintViolations().stream()
-                .map(GlobalExceptionHandler::formatViolation)
-                .collect(Collectors.joining("; "));
+        String detail = ValidationMessageUtils.describe(ex);
         return problem(HttpStatus.BAD_REQUEST, "Validation failed",
                 detail.isBlank() ? ex.getMessage() : detail);
     }
@@ -53,12 +49,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("Unhandled exception", ex);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
                 "An unexpected error occurred. Please try again later.");
-    }
-
-    private static String formatViolation(ConstraintViolation<?> violation) {
-        String path = violation.getPropertyPath().toString();
-        String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
-        return "%s: %s".formatted(field, violation.getMessage());
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
